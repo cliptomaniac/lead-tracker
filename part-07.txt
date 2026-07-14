@@ -1,0 +1,245 @@
+ion(session);
+      const existingCloudSession = state.sessions.some(s => s.id === session.id);
+      const hasCloudId = isUuid(session.id) && existingCloudSession;
+      const path = hasCloudId ? `/rest/v1/lead_sessions?id=eq.${encodeURIComponent(session.id)}&select=*` : "/rest/v1/lead_sessions?select=*";
+      const { data, error } = await supabaseFetch(path, {
+        method: hasCloudId ? "PATCH" : "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify(row)
+      });
+      if (error) {
+        toast(error.message || "Could not save session");
+        return false;
+      }
+      const returned = Array.isArray(data) ? data[0] : data;
+      if (!returned) {
+        toast("Cloud save returned no record. Draft kept locally.");
+        return false;
+      }
+      const saved = fromDbSession(returned);
+      const index = state.sessions.findIndex(s => s.id === session.id);
+      if (index >= 0) state.sessions[index] = saved;
+      else state.sessions.unshift(saved);
+      clearEmergencyDraft(session.id);
+      return true;
+    }
+
+    function saveEmergencyDraft(session) {
+      try {
+        const drafts = JSON.parse(localStorage.getItem(`${STORAGE_KEY}-drafts`) || "[]");
+        const next = [
+          { ...session, savedAt: new Date().toISOString() },
+          ...drafts.filter(draft => draft.id !== session.id)
+        ].slice(0, 10);
+        localStorage.setItem(`${STORAGE_KEY}-drafts`, JSON.stringify(next));
+      } catch (error) {}
+    }
+
+    function clearEmergencyDraft(id) {
+      try {
+        const drafts = JSON.parse(localStorage.getItem(`${STORAGE_KEY}-drafts`) || "[]");
+        localStorage.setItem(`${STORAGE_KEY}-drafts`, JSON.stringify(drafts.filter(draft => draft.id !== id)));
+      } catch (error) {}
+    }
+
+    async function deleteCloudSession(id) {
+      if (!currentUser) return false;
+      const { error } = await supabaseFetch(`/rest/v1/lead_sessions?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (error) {
+        toast(error.message || "Could not delete session");
+        return false;
+      }
+      return true;
+    }
+
+    async function saveCloudClient(key, meta) {
+      if (!currentUser) return false;
+      const company = getClients().find(c => c.key === key)?.company || key;
+      const { error } = await supabaseFetch("/rest/v1/clients?on_conflict=user_id,company_key", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          company,
+          company_key: key,
+          industry: meta.industry || null,
+          primary_offer: meta.primaryOffer || null,
+          bureau: meta.bureau || null,
+          relationship_score: Number(meta.relationshipScore || 5),
+          notes: meta.notes || null
+        })
+      });
+      if (error) {
+        toast(error.message || "Could not save client");
+        return false;
+      }
+      return true;
+    }
+
+    async function importToCloud(replace = false, reloadAfter = true) {
+      if (!currentUser) return false;
+      const imported = cloneImportedData();
+      setAuthStatus("Uploading 2026 data to Supabase...");
+      if (replace) {
+        await supabaseFetch(`/rest/v1/lead_sessions?user_id=eq.${currentUser.id}`, { method: "DELETE" });
+        await supabaseFetch(`/rest/v1/clients?user_id=eq.${currentUser.id}`, { method: "DELETE" });
+      }
+      const sessionRows = imported.sessions.map(toDbSession).map(row => {
+        const { id, ...withoutId } = row;
+        return withoutId;
+      });
+      const sessionsResult = await supabaseFetch("/rest/v1/lead_sessions", {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(sessionRows)
+      });
+      if (sessionsResult.error) {
+        toast(sessionsResult.error.message || "Could not upload sessions");
+        return false;
+      }
+      const clientRows = Object.entries(imported.clientMeta).map(([key, meta]) => ({
+        user_id: currentUser.id,
+        company: key.split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" "),
+        company_key: key,
+        industry: meta.industry || null,
+        primary_offer: meta.primaryOffer || null,
+        bureau: meta.bureau || null,
+        relationship_score: Number(meta.relationshipScore || 5),
+        notes: meta.notes || null
+      }));
+      if (clientRows.length) {
+        const clientsResult = await supabaseFetch("/rest/v1/clients?on_conflict=user_id,company_key", {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify(clientRows)
+        });
+        if (clientsResult.error) {
+          toast(clientsResult.error.message || "Could not upload clients");
+          return false;
+        }
+      }
+      if (reloadAfter) await loadCloudData(false);
+      else await loadCloudData(false);
+      toast("2026 data uploaded to Supabase");
+      return true;
+    }
+
+    function toDbSession(session) {
+      const row = {
+        user_id: currentUser.id,
+        session_date: session.date || null,
+        name: session.name,
+        company: session.company || null,
+        stage: session.stage || "Message",
+        priority: session.priority || "Med",
+        reason: session.reason || null,
+        platform: session.platform || null,
+        lead_source: session.leadSource || null,
+        last_contacted: session.lastContacted || null,
+        follow_up: session.followUp || null,
+        notes: session.notes || null,
+        next_action: session.nextAction || null,
+        testimonial: session.testimonial || null,
+        fee: Number(session.fee || 0)
+      };
+      if (isUuid(session.id)) row.id = session.id;
+      return row;
+    }
+
+    function fromDbSession(row) {
+      return {
+        id: row.id,
+        date: row.session_date || "",
+        name: row.name || "",
+        company: row.company || "",
+        stage: row.stage || "Message",
+        priority: row.priority || "Med",
+        reason: row.reason || "",
+        platform: row.platform || "E-Mail",
+        leadSource: row.lead_source || "",
+        lastContacted: row.last_contacted || "",
+        followUp: row.follow_up || "",
+        notes: row.notes || "",
+        nextAction: row.next_action || "",
+        testimonial: row.testimonial || "No",
+        fee: row.fee || "",
+        createdAt: row.created_at || "",
+        updatedAt: row.updated_at || ""
+      };
+    }
+
+    function fromDbClient(row) {
+      return {
+        industry: row.industry || "",
+        primaryOffer: row.primary_offer || "",
+        bureau: row.bureau || "",
+        relationshipScore: String(row.relationship_score || 5),
+        notes: row.notes || ""
+      };
+    }
+
+    function isUuid(value) {
+      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+    }
+
+    function normalise(value) {
+      return String(value || "").trim().toLowerCase();
+    }
+
+    function fmtDate(value) {
+      if (!value) return "No date";
+      const date = new Date(value + "T00:00:00");
+      return date.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+    }
+
+    function fmtMoney(value) {
+      return new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(value || 0));
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[char]));
+    }
+
+    function sessionDefaults() {
+      return {
+        id: uid(),
+        date: TODAY,
+        name: "",
+        company: "",
+        stage: "Message",
+        priority: "Med",
+        reason: "",
+        platform: "LinkedIn",
+        leadSource: "Referral",
+        lastContacted: TODAY,
+        followUp: "",
+        notes: "",
+        nextAction: "",
+        testimonial: "No",
+        fee: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    async function setup() {
+      fillSelect(els.stage, STAGES);
+      fillSelect(els.stageFilter, ["All stages", ...STAGES], ["", ...STAGES]);
+      fillSelect(els.platform, PLATFORMS);
+      fillSelect(els.platformFilter, ["All platforms", ...PLATFORMS], ["", ...PLATFORMS]);
+      fillSelect(els.leadSource, SOURCES);
+      fillSelect(els.sourceFilter, ["All sources", ...SOURCES], ["", ...SOURCES]);
+      fillSelect(els.clientSourceFilter, ["All sources", ...SOURCES], ["", ...SOURCES]);
+      fillSelect(els.clientScore, Array.from({ length: 10 }, (_, i) => String(i + 1)));
+      fillDatalist(els.reasonList, REASONS);
+      fillDatalist(els.industryList, INDUSTRIES);
+      fillDatalist(els.offerList, OFFERS);
+      renderReasonChips();
+      bindEvents();
+      render();
+      await initCloud();
+    }
+
+    function fillSelect(select, labels, values = labels) 

@@ -1,0 +1,193 @@
+{
+      select.innerHTML = labels.map((label, i) => `<option value="${escapeHtml(values[i])}">${escapeHtml(label)}</option>`).join("");
+    }
+
+    function fillDatalist(list, values) {
+      list.innerHTML = values.map(value => `<option value="${escapeHtml(value)}"></option>`).join("");
+    }
+
+    function renderReasonChips() {
+      els.reasonChips.innerHTML = REASONS.slice(0, -1).map(reason => `<button type="button" class="chip" data-reason="${escapeHtml(reason)}">${escapeHtml(reason)}</button>`).join("");
+      els.reasonChips.addEventListener("click", event => {
+        const button = event.target.closest("[data-reason]");
+        if (!button) return;
+        els.reason.value = button.dataset.reason;
+        renderChipSelection();
+      });
+    }
+
+    function renderChipSelection() {
+      document.querySelectorAll("[data-reason]").forEach(button => {
+        button.classList.toggle("selected", button.dataset.reason === els.reason.value);
+      });
+    }
+
+    function bindEvents() {
+      document.querySelectorAll(".nav button").forEach(button => {
+        button.addEventListener("click", () => {
+          currentView = button.dataset.view;
+          render();
+        });
+      });
+
+      [els.newSessionTop, els.newSessionSide].forEach(button => button.addEventListener("click", () => openSessionDrawer()));
+      els.closeDrawer.addEventListener("click", closeSessionDrawer);
+      els.cancelSession.addEventListener("click", closeSessionDrawer);
+      els.sessionForm.addEventListener("submit", saveSessionFromForm);
+      els.deleteSession.addEventListener("click", deleteCurrentSession);
+      els.name.addEventListener("input", checkDuplicateName);
+      els.reason.addEventListener("input", renderChipSelection);
+
+      [els.search, els.stageFilter, els.priorityFilter, els.platformFilter, els.sourceFilter].forEach(control => {
+        control.addEventListener("input", renderLeadList);
+      });
+      [els.clientSearch, els.clientSourceFilter, els.clientScoreFilter, els.clientOpenFilter].forEach(control => {
+        control.addEventListener("input", renderClientList);
+      });
+
+      els.leadList.addEventListener("click", handleLeadClick);
+      els.dueList.addEventListener("click", handleLeadClick);
+      els.clientList.addEventListener("click", handleClientClick);
+      els.personTimeline.addEventListener("click", event => {
+        const button = event.target.closest("[data-history-edit]");
+        if (!button) return;
+        closePersonModal();
+        openSessionDrawer(state.sessions.find(s => s.id === button.dataset.historyEdit));
+      });
+      els.closePerson.addEventListener("click", closePersonModal);
+      els.personModal.addEventListener("click", event => {
+        if (event.target === els.personModal) closePersonModal();
+      });
+      els.closeClient.addEventListener("click", closeClientDrawer);
+      els.cancelClient.addEventListener("click", closeClientDrawer);
+      els.clientForm.addEventListener("submit", saveClientMeta);
+
+      [els.add2026Data, els.add2026DataTop].forEach(button => button.addEventListener("click", addImportedData));
+      els.exportData.addEventListener("click", exportData);
+      els.importData.addEventListener("click", () => els.importFile.click());
+      els.importFile.addEventListener("change", importData);
+    }
+
+    function render() {
+      renderNav();
+      renderDataLists();
+      renderHeader();
+      renderStats();
+      els.dashboardOnly.classList.toggle("hidden", currentView !== "active");
+      els.trackerView.classList.toggle("hidden", currentView === "clients");
+      els.clientsView.classList.toggle("hidden", currentView !== "clients");
+      document.querySelectorAll(".nav button").forEach(button => button.classList.toggle("active", button.dataset.view === currentView));
+      if (currentView === "clients") renderClientList();
+      else renderLeadList();
+    }
+
+    function renderNav() {
+      const active = state.sessions.filter(s => !ARCHIVE_STAGES.includes(s.stage)).length;
+      els.countActive.textContent = active;
+      els.countCompleted.textContent = state.sessions.filter(s => s.stage === "Completed").length;
+      els.countNo.textContent = state.sessions.filter(s => s.stage === "No").length;
+      els.countNotNow.textContent = state.sessions.filter(s => s.stage === "Not Now").length;
+      els.countClients.textContent = getClients().length;
+    }
+
+    function renderDataLists() {
+      fillDatalist(els.nameList, unique(state.sessions.map(s => s.name)));
+      fillDatalist(els.companyList, unique(state.sessions.map(s => s.company)));
+    }
+
+    function renderHeader() {
+      const labels = {
+        active: ["Active Pipeline", "Live sessions that still need attention."],
+        completed: ["Completed", "Delivered sessions, kept out of the active pipeline."],
+        no: ["No", "Leads that have closed as no."],
+        notNow: ["Not Now", "Parked relationships for later."],
+        clients: ["Clients", "Company-level view that never disappears."]
+      };
+      els.viewTitle.textContent = labels[currentView][0];
+      els.viewSubtitle.textContent = labels[currentView][1];
+    }
+
+    function renderStats() {
+      const active = state.sessions.filter(s => !ARCHIVE_STAGES.includes(s.stage));
+      const due = getDueSessions(active);
+      els.statActive.textContent = active.length;
+      els.statProposals.textContent = active.filter(s => s.stage === "Proposal Sent").length;
+      els.statDue.textContent = due.length;
+      els.dueStrip.classList.toggle("show", due.length > 0);
+      els.dueCountLabel.textContent = `${due.length} due`;
+      els.dueList.innerHTML = due.map(s => leadRowHtml(s, true)).join("");
+    }
+
+    function getDueSessions(sessions) {
+      return sessions
+        .filter(s => s.followUp && s.followUp <= TODAY)
+        .sort((a, b) => a.followUp.localeCompare(b.followUp));
+    }
+
+    function sessionsForCurrentView() {
+      if (currentView === "active") return state.sessions.filter(s => !ARCHIVE_STAGES.includes(s.stage));
+      if (currentView === "completed") return state.sessions.filter(s => s.stage === "Completed");
+      if (currentView === "no") return state.sessions.filter(s => s.stage === "No");
+      if (currentView === "notNow") return state.sessions.filter(s => s.stage === "Not Now");
+      return [];
+    }
+
+    function sessionMatchesSearch(session, search) {
+      return [
+        session.name,
+        session.company,
+        session.stage,
+        session.priority,
+        session.reason,
+        session.platform,
+        session.leadSource,
+        session.lastContacted,
+        session.followUp,
+        session.date,
+        session.notes,
+        session.nextAction,
+        session.testimonial,
+        session.fee
+      ].some(value => normalise(value).includes(search));
+    }
+
+    function renderLeadList() {
+      const search = normalise(els.search.value);
+      let sessions = search ? state.sessions.slice() : sessionsForCurrentView();
+      if (search) sessions = sessions.filter(s => sessionMatchesSearch(s, search));
+      if (els.stageFilter.value) sessions = sessions.filter(s => s.stage === els.stageFilter.value);
+      if (els.priorityFilter.value) sessions = sessions.filter(s => s.priority === els.priorityFilter.value);
+      if (els.platformFilter.value) sessions = sessions.filter(s => s.platform === els.platformFilter.value);
+      if (els.sourceFilter.value) sessions = sessions.filter(s => s.leadSource === els.sourceFilter.value);
+
+      sessions.sort((a, b) => getSortDate(b).localeCompare(getSortDate(a)));
+
+      const emptyMessage = search ? "No matching sessions found across the whole tracker." : "No sessions here yet.";
+      const people = groupSessionsByPerson(sessions);
+      els.leadList.innerHTML = people.length ? people.map(personRowHtml).join("") : `<div class="empty">${emptyMessage}</div>`;
+    }
+
+    function groupSessionsByPerson(sessions) {
+      const map = new Map();
+      sessions.forEach(session => {
+        const key = normalise(session.name || "Unnamed");
+        if (!map.has(key)) map.set(key, { key, name: session.name || "Unnamed", sessions: [] });
+        map.get(key).sessions.push(session);
+      });
+      return Array.from(map.values()).map(person => {
+        person.sessions.sort((a, b) => getSortDate(b).localeCompare(getSortDate(a)));
+        person.latest = person.sessions[0];
+        person.openCount = person.sessions.filter(s => !ARCHIVE_STAGES.includes(s.stage)).length;
+        return person;
+      }).sort((a, b) => getSortDate(b.latest).localeCompare(getSortDate(a.latest)));
+    }
+
+    function personRowHtml(person) {
+      const latest = person.latest;
+      const stageSummary = unique(person.sessions.map(s => s.stage)).slice(0, 3);
+      const moreStages = unique(person.sessions.map(s => s.stage)).length - stageSummary.length;
+      return `
+        <article class="person-card" data-person-card="${escapeHtml(person.key)}">
+          <div class="person-top">
+            <div>
+     

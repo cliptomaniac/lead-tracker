@@ -1,0 +1,190 @@
+> ${escapeHtml(latest.name)}, ${matches.length} previous session${matches.length === 1 ? "" : "s"}, last stage: ${escapeHtml(latest.stage)}.</div>
+        <div class="duplicate-actions">
+          <button type="button" class="quick-button" id="continue-new">Add as new session</button>
+          <button type="button" class="secondary" id="view-history">View history</button>
+        </div>
+      `;
+      els.duplicatePrompt.classList.add("show");
+      document.getElementById("continue-new").addEventListener("click", () => {
+        els.duplicatePrompt.classList.remove("show");
+        toast("New session will be added");
+      });
+      document.getElementById("view-history").addEventListener("click", () => openPersonModal(latest.name));
+    }
+
+    function getSortDate(session) {
+      if (session.updatedAt) return session.updatedAt;
+      if (session.createdAt) return session.createdAt;
+      if (session.date) return `${session.date}T00:00:00.000Z`;
+      return "0000-00-00T00:00:00.000Z";
+    }
+
+    function openPersonModal(name) {
+      const matches = state.sessions.filter(s => normalise(s.name) === normalise(name)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      if (!matches.length) return;
+      const latest = matches[0];
+      els.personTitle.textContent = latest.name || "Unnamed";
+      els.personSummary.textContent = `${matches.length} session${matches.length === 1 ? "" : "s"} · ${latest.company || "No company"} · last stage: ${latest.stage}`;
+      els.personTimeline.innerHTML = matches.map(s => `
+        <article class="timeline-item">
+          <div class="timeline-top">
+            <strong>${fmtDate(s.date)}</strong>
+            <span class="pill stage">${escapeHtml(s.stage)}</span>
+          </div>
+          <div class="detail-grid">
+            <div><b>Company:</b> ${escapeHtml(s.company || "No company")}</div>
+            <div><b>Platform:</b> ${escapeHtml(s.platform || "")}</div>
+            <div><b>Reason:</b> ${escapeHtml(s.reason || "None")}</div>
+            <div><b>Follow up:</b> ${fmtDate(s.followUp)}</div>
+            <div><b>Source:</b> ${escapeHtml(s.leadSource || "")}</div>
+            <div><b>Fee:</b> ${fmtMoney(s.fee)}</div>
+          </div>
+          ${s.nextAction ? `<p><b>Next action:</b> ${escapeHtml(s.nextAction)}</p>` : ""}
+          ${s.notes ? `<p><b>Notes:</b> ${escapeHtml(s.notes)}</p>` : ""}
+          <div class="actions"><button type="button" class="mini-button" data-history-edit="${s.id}">Edit this session</button></div>
+        </article>
+      `).join("");
+      els.personModal.classList.add("show");
+      els.personModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closePersonModal() {
+      els.personModal.classList.remove("show");
+      els.personModal.setAttribute("aria-hidden", "true");
+    }
+
+    function getClients() {
+      const map = new Map();
+      state.sessions.forEach(s => {
+        const company = (s.company || "No company").trim();
+        const key = normalise(company);
+        if (!map.has(key)) {
+          map.set(key, { key, company, sessions: [] });
+        }
+        map.get(key).sessions.push(s);
+      });
+      return Array.from(map.values()).map(client => {
+        const meta = state.clientMeta[client.key] || {};
+        const sessions = client.sessions;
+        const completed = sessions.filter(s => s.stage === "Completed");
+        const active = sessions.filter(s => !ARCHIVE_STAGES.includes(s.stage));
+        const last = sessions.slice().sort((a, b) => (b.lastContacted || b.date || "").localeCompare(a.lastContacted || a.date || ""))[0];
+        return {
+          ...client,
+          industry: meta.industry || "",
+          primaryOffer: meta.primaryOffer || "",
+          bureau: meta.bureau || "",
+          relationshipScore: meta.relationshipScore || "5",
+          notes: meta.notes || "",
+          jobsDone: completed.length,
+          revenue: sessions.reduce((sum, s) => sum + Number(s.fee || 0), 0),
+          openOpportunities: active.length,
+          lastContact: last?.lastContacted || last?.date || "",
+          leadSource: last?.leadSource || ""
+        };
+      }).sort((a, b) => b.openOpportunities - a.openOpportunities || a.company.localeCompare(b.company));
+    }
+
+    function renderClientList() {
+      let clients = getClients();
+      const search = normalise(els.clientSearch.value);
+      if (search) clients = clients.filter(c => [c.company, c.industry, c.notes, c.primaryOffer].some(v => normalise(v).includes(search)));
+      if (els.clientSourceFilter.value) clients = clients.filter(c => c.leadSource === els.clientSourceFilter.value);
+      if (els.clientScoreFilter.value) clients = clients.filter(c => Number(c.relationshipScore || 0) >= Number(els.clientScoreFilter.value));
+      if (els.clientOpenFilter.value === "open") clients = clients.filter(c => c.openOpportunities > 0);
+      if (els.clientOpenFilter.value === "none") clients = clients.filter(c => c.openOpportunities === 0);
+      els.clientList.innerHTML = clients.length ? clients.map(clientRowHtml).join("") : `<div class="empty">Companies will appear here after sessions are added.</div>`;
+    }
+
+    function clientRowHtml(c) {
+      return `
+        <article class="client-card" data-client="${escapeHtml(c.key)}">
+          <div><strong>${escapeHtml(c.company)}</strong><div class="small">${escapeHtml(c.industry || "No industry")} · ${escapeHtml(c.primaryOffer || "No offer")}${c.bureau ? ` · Bureau: ${escapeHtml(c.bureau)}` : ""}</div></div>
+          <div><b>${c.jobsDone}</b><div class="small">Jobs done</div></div>
+          <div><b>${fmtMoney(c.revenue)}</b><div class="small">Revenue</div></div>
+          <div><b>${c.openOpportunities}</b><div class="small">Open opps</div></div>
+          <div><b>${fmtDate(c.lastContact)}</b><div class="small">${escapeHtml(c.leadSource || "No source")}</div></div>
+          <span class="pill stage">Score ${escapeHtml(c.relationshipScore || "5")}</span>
+          <div class="actions">
+            <button type="button" class="icon-button" title="Edit client" aria-label="Edit client" data-client-edit="${escapeHtml(c.key)}">✎</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function handleClientClick(event) {
+      const button = event.target.closest("[data-client-edit]");
+      const card = event.target.closest("[data-client]");
+      const key = button?.dataset.clientEdit || card?.dataset.client;
+      if (key) openClientDrawer(key);
+    }
+
+    function openClientDrawer(key) {
+      const client = getClients().find(c => c.key === key);
+      if (!client) return;
+      els.clientCompanyKey.value = key;
+      els.clientCompany.value = client.company;
+      els.clientIndustry.value = client.industry || "";
+      els.clientPrimaryOffer.value = client.primaryOffer || "";
+      els.clientBureau.value = client.bureau || "";
+      els.clientScore.value = client.relationshipScore || "5";
+      els.clientNotes.value = client.notes || "";
+      els.clientDrawer.classList.add("show");
+      els.clientDrawer.setAttribute("aria-hidden", "false");
+    }
+
+    function closeClientDrawer() {
+      els.clientDrawer.classList.remove("show");
+      els.clientDrawer.setAttribute("aria-hidden", "true");
+    }
+
+    async function saveClientMeta(event) {
+      event.preventDefault();
+      const key = els.clientCompanyKey.value;
+      const meta = {
+        industry: els.clientIndustry.value.trim(),
+        primaryOffer: els.clientPrimaryOffer.value.trim(),
+        bureau: els.clientBureau.value,
+        relationshipScore: els.clientScore.value,
+        notes: els.clientNotes.value.trim()
+      };
+      state.clientMeta[key] = meta;
+      if (currentUser) {
+        const saved = await saveCloudClient(key, meta);
+        if (!saved) return;
+      } else {
+        saveState();
+      }
+      closeClientDrawer();
+      render();
+      toast("Client saved");
+    }
+
+    function unique(values) {
+      return Array.from(new Set(values.map(v => String(v || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lead-tracker-backup-${TODAY}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Backup exported");
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const imported = JSON.parse(reader.result);
+          if (!Array.isArray(imported.sessions)) throw new Error("Invalid file");
+          if (!confirm("Replace the current Lead Tracker data with this backup?")) return;
+          state = { sessions: imported.sessions, clientMeta: imported.clientMeta || {} };
+          saveState();
+          render();
+          

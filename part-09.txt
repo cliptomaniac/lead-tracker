@@ -1,0 +1,201 @@
+         <button type="button" class="name-button" data-person="${escapeHtml(person.name)}">${escapeHtml(person.name)}</button>
+              <div class="small">${person.sessions.length} session${person.sessions.length === 1 ? "" : "s"} · latest ${fmtDate(latest.date)} · ${escapeHtml(latest.company || "No company")}</div>
+            </div>
+            <div class="person-summary">
+              <span class="pill stage">${person.openCount} open</span>
+              ${stageSummary.map(stage => `<span class="pill stage">${escapeHtml(stage)}</span>`).join("")}
+              ${moreStages > 0 ? `<span class="pill">+${moreStages}</span>` : ""}
+            </div>
+          </div>
+          <div class="session-stack">
+            ${person.sessions.map(sessionLineHtml).join("")}
+          </div>
+        </article>
+      `;
+    }
+
+    function sessionLineHtml(s) {
+      const dueText = s.followUp ? fmtDate(s.followUp) : "No follow up";
+      const detail = s.nextAction || s.notes || s.reason || "No next action";
+      return `
+        <div class="session-line" data-id="${s.id}">
+          <div class="session-main">
+            <b>${escapeHtml(s.company || "No company")}</b>
+            <div class="small">${escapeHtml(s.reason || "No reason")} · ${fmtDate(s.date)}</div>
+          </div>
+          <span class="pill stage">${escapeHtml(s.stage)}</span>
+          <span class="pill ${String(s.priority || "").toLowerCase()}">${escapeHtml(s.priority || "Med")}</span>
+          <div><b>${dueText}</b><div class="small">${escapeHtml(detail)}</div></div>
+          <div class="actions">
+            <button type="button" class="icon-button" title="Edit this session" aria-label="Edit this session" data-edit="${s.id}">✎</button>
+            <button type="button" class="icon-button" title="Duplicate session" aria-label="Duplicate session" data-duplicate="${s.id}">＋</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function leadRowHtml(s, compact = false) {
+      const dueText = s.followUp ? fmtDate(s.followUp) : "No follow up";
+      const dueClass = s.followUp && s.followUp <= TODAY ? " high" : "";
+      if (compact) {
+        return `
+          <article class="due-item" data-id="${s.id}">
+            <div><button type="button" class="name-button" data-person="${escapeHtml(s.name)}">${escapeHtml(s.name || "Unnamed")}</button><div class="small">${escapeHtml(s.company || "No company")}</div></div>
+            <span class="pill stage">${escapeHtml(s.stage)}</span>
+            <span class="pill${dueClass}">${dueText}</span>
+            <div class="actions"><button type="button" class="quick-button" data-edit="${s.id}">Log / Update</button></div>
+          </article>
+        `;
+      }
+      return `
+        <article class="lead-card" data-id="${s.id}">
+          <div>
+            <button type="button" class="name-button" data-person="${escapeHtml(s.name)}">${escapeHtml(s.name || "Unnamed")}</button>
+            <div class="small">${escapeHtml(s.company || "No company")} · ${fmtDate(s.date)}</div>
+          </div>
+          <span class="pill stage">${escapeHtml(s.stage)}</span>
+          <span class="pill ${String(s.priority || "").toLowerCase()}">${escapeHtml(s.priority || "Med")}</span>
+          <div><b>${escapeHtml(s.platform || "")}</b><div class="small">${escapeHtml(s.leadSource || "")}</div></div>
+          <div><b>${dueText}</b><div class="small">${escapeHtml(s.nextAction || s.reason || "No next action")}</div></div>
+          <div class="actions">
+            <button type="button" class="icon-button" title="Edit" aria-label="Edit" data-edit="${s.id}">✎</button>
+            <button type="button" class="icon-button" title="Duplicate session" aria-label="Duplicate session" data-duplicate="${s.id}">＋</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function handleLeadClick(event) {
+      const personButton = event.target.closest("[data-person]");
+      const editButton = event.target.closest("[data-edit]");
+      const duplicateButton = event.target.closest("[data-duplicate]");
+      if (personButton) openPersonModal(personButton.dataset.person);
+      if (editButton) openSessionDrawer(state.sessions.find(s => s.id === editButton.dataset.edit));
+      if (duplicateButton) duplicateSession(duplicateButton.dataset.duplicate);
+    }
+
+    function openSessionDrawer(session = null) {
+      editingId = session ? session.id : null;
+      const data = session || sessionDefaults();
+      els.drawerTitle.textContent = session ? "Edit Session" : "Add Session";
+      els.deleteSession.classList.toggle("hidden", !session);
+      setForm(data);
+      els.duplicatePrompt.classList.remove("show");
+      renderChipSelection();
+      els.sessionDrawer.classList.add("show");
+      els.sessionDrawer.setAttribute("aria-hidden", "false");
+      setTimeout(() => els.name.focus(), 80);
+    }
+
+    function closeSessionDrawer() {
+      els.sessionDrawer.classList.remove("show");
+      els.sessionDrawer.setAttribute("aria-hidden", "true");
+      editingId = null;
+    }
+
+    function setForm(session) {
+      els.sessionId.value = session.id || "";
+      els.date.value = session.date || TODAY;
+      els.name.value = session.name || "";
+      els.company.value = session.company || "";
+      els.stage.value = session.stage || "Message";
+      els.priority.value = session.priority || "Med";
+      els.reason.value = session.reason || "";
+      els.platform.value = session.platform || "LinkedIn";
+      els.leadSource.value = session.leadSource || "Referral";
+      els.lastContacted.value = session.lastContacted || "";
+      els.followUp.value = session.followUp || "";
+      els.notes.value = session.notes || "";
+      els.nextAction.value = session.nextAction || "";
+      els.testimonial.value = session.testimonial || "No";
+      els.fee.value = session.fee || "";
+    }
+
+    function getFormSession() {
+      const existing = state.sessions.find(s => s.id === els.sessionId.value);
+      const now = new Date().toISOString();
+      return {
+        id: els.sessionId.value || uid(),
+        date: els.date.value || TODAY,
+        name: els.name.value.trim(),
+        company: els.company.value.trim(),
+        stage: els.stage.value,
+        priority: els.priority.value,
+        reason: els.reason.value.trim(),
+        platform: els.platform.value,
+        leadSource: els.leadSource.value,
+        lastContacted: els.lastContacted.value,
+        followUp: els.followUp.value,
+        notes: els.notes.value.trim(),
+        nextAction: els.nextAction.value.trim(),
+        testimonial: els.testimonial.value,
+        fee: els.fee.value,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now
+      };
+    }
+
+    async function saveSessionFromForm(event) {
+      event.preventDefault();
+      const session = getFormSession();
+      if (!session.name) {
+        toast("Add a name first");
+        els.name.focus();
+        return;
+      }
+      saveEmergencyDraft(session);
+      if (currentUser) {
+        const saved = await saveCloudSessionRecord(session);
+        if (!saved) return;
+      } else {
+        const index = state.sessions.findIndex(s => s.id === session.id);
+        if (index >= 0) state.sessions[index] = session;
+        else state.sessions.unshift(session);
+        saveState();
+      }
+      closeSessionDrawer();
+      render();
+      toast("Session saved");
+    }
+
+    async function deleteCurrentSession() {
+      if (!editingId) return;
+      const session = state.sessions.find(s => s.id === editingId);
+      if (!confirm(`Delete this session for ${session?.name || "this contact"}?`)) return;
+      if (currentUser) {
+        const deleted = await deleteCloudSession(editingId);
+        if (!deleted) return;
+      }
+      state.sessions = state.sessions.filter(s => s.id !== editingId);
+      if (!currentUser) saveState();
+      closeSessionDrawer();
+      render();
+      toast("Session deleted");
+    }
+
+    function duplicateSession(id) {
+      const original = state.sessions.find(s => s.id === id);
+      if (!original) return;
+      const now = new Date().toISOString();
+      const copy = { ...original, id: uid(), date: TODAY, lastContacted: TODAY, followUp: "", stage: "Message", notes: "", nextAction: "", createdAt: now, updatedAt: now };
+      openSessionDrawer(copy);
+      editingId = null;
+      els.drawerTitle.textContent = "Add New Session";
+      checkDuplicateName();
+    }
+
+    function checkDuplicateName() {
+      const name = normalise(els.name.value);
+      if (!name) {
+        els.duplicatePrompt.classList.remove("show");
+        return;
+      }
+      const matches = state.sessions.filter(s => normalise(s.name) === name && s.id !== editingId);
+      if (!matches.length) {
+        els.duplicatePrompt.classList.remove("show");
+        return;
+      }
+      matches.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      const latest = matches[0];
+      els.duplicatePrompt.innerHTML = `
+        <div><strong>Existing contact:</strong

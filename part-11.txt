@@ -1,0 +1,21 @@
+toast("Backup imported");
+        } catch (error) {
+          toast("Could not import file");
+        } finally {
+          els.importFile.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function toast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("show");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => els.toast.classList.remove("show"), 1800);
+    }
+
+    setup();
+  </script>
+</body>
+</html>

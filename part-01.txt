@@ -1,0 +1,349 @@
+4; }
+    .pill.med { background: rgba(248, 189, 78, .15); color: #ffd98e; }
+    .pill.low { background: rgba(104, 168, 255, .14); color: #b9d6ff; }
+    .pill.stage { background: rgba(29, 184, 155, .14); color: var(--accent-2); }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .icon-button {
+      width: 46px;
+      padding: 0;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      font-size: 18px;
+    }
+
+    .icon-button:hover { border-color: var(--accent); }
+    .icon-button.danger:hover { border-color: var(--danger); color: #ffb4b4; }
+
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      color: var(--muted);
+      padding: 34px 18px;
+      text-align: center;
+      background: rgba(16, 29, 36, .58);
+    }
+
+    .drawer,
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+    }
+
+    .drawer.show,
+    .modal-backdrop.show {
+      display: block;
+    }
+
+    .drawer::before,
+    .modal-backdrop {
+      background: rgba(3, 10, 13, .72);
+      backdrop-filter: blur(5px);
+    }
+
+    .drawer::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+    }
+
+    .drawer-panel {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: min(720px, 100%);
+      height: 100%;
+      background: #0c1920;
+      border-left: 1px solid var(--line);
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .drawer-header,
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .drawer-header h3,
+    .modal-header h3 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .field.full { grid-column: 1 / -1; }
+
+    .field label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 7px;
+    }
+
+    .field .hint {
+      color: var(--accent-2);
+      font-weight: 800;
+    }
+
+    .form-actions {
+      position: sticky;
+      bottom: 0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 18px;
+      margin-top: 18px;
+      background: linear-gradient(to top, #0c1920 70%, rgba(12, 25, 32, 0));
+    }
+
+    .duplicate {
+      display: none;
+      margin: 0 0 16px;
+      padding: 14px;
+      border: 1px solid rgba(29, 184, 155, .4);
+      background: rgba(29, 184, 155, .1);
+      border-radius: var(--radius);
+    }
+
+    .duplicate.show { display: block; }
+
+    .duplicate strong { color: var(--accent-2); }
+
+    .duplicate-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .modal-card {
+      width: min(760px, calc(100vw - 28px));
+      max-height: calc(100vh - 28px);
+      overflow-y: auto;
+      background: #0c1920;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin: 14px auto;
+      padding: 22px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .timeline-item {
+      border-left: 3px solid var(--accent);
+      background: var(--panel);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 14px;
+    }
+
+    .timeline-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .detail-grid b {
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      padding: 0 11px;
+      color: var(--muted);
+    }
+
+    .chip:hover,
+    .chip.selected {
+      color: #05231e;
+      background: var(--accent);
+      border-color: var(--accent);
+      font-weight: 900;
+    }
+
+    .mini-button {
+      min-height: 34px;
+      padding: 0 10px;
+      background: var(--panel-2);
+      color: var(--muted);
+      border: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .mini-button:hover { color: var(--text); border-color: var(--accent); }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 20px;
+      transform: translateX(-50%) translateY(30px);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+      background: var(--accent);
+      color: #05231e;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-weight: 900;
+      transition: .2s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        padding: 18px;
+      }
+      .nav {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .sidebar-footer {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .main { padding: 20px 16px; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .auth-grid { grid-template-columns: 1fr 1fr; }
+      .lead-card,
+      .client-card,
+      .session-line,
+      .due-item {
+        grid-template-columns: 1fr 1fr;
+      }
+      .person-top {
+        grid-template-columns: 1fr;
+      }
+      .person-summary {
+        justify-content: flex-start;
+      }
+      .actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .topbar {
+        display: grid;
+      }
+      .stats,
+      .form-grid,
+      .detail-grid,
+      .toolbar,
+      .auth-grid,
+      .nav,
+      .sidebar-footer,
+      .lead-card,
+      .client-card,
+      .person-top,
+      .session-line,
+      .due-item {
+        grid-template-columns: 1fr;
+      }
+      .drawer-panel { padding: 18px; }
+      .form-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .primary,
+      .secondary {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">TD</div>
+        <div>
+          <h1>Lead Tracker</h1>
+          <p>Andrew Miles Davis</p>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Views">
+        <button type="button" class="active" data-view="active">Active <span class="count" id="count-active">0</span></button>
+        <button type="button" data-view="completed">Completed <span class="count" id="count-completed">0</span></button>
+        <button type="button" data-view="no">No <span class="count" id="count-no">0</span></button>
+        <button type="button" data-view="notNow">Not Now <span class="count" id="count-notNow">0</span></button>
+        <button type="button" data-view="clients">Clients <span class="count" id="count-clients">0</span></button>
+      </nav>
+      <div class="sidebar-footer">
+        <button type="button" class="primary" id="new-session-side">+ Add Session</button>
+        <button type="button" class="secondary" id="add-2026-data" onclick="resetToImportedData()">Load 2026 Data</button>
+        <button type="button" class="secondary" id="export-data">Export</button>
+        <button type="button" class="secondary" id="import-data">Import</button>
+        <input class="hidden" id="import-file" type="file" accept="application/json">
+        <div class="small" id="cloud-status">Local mode</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h2 id="view-title">Active Pipeline</h2>
+          <p id="view-subtitle">Live sessions that still need attention.</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="secondary" id="add-2026-data-top" onclick="resetToImportedData()">Load 2026 Data</button>
+          <button type="button" class="primary" id="new-session-top">+ Add Session</button>
+        </div>
+      </div>
+
+      <section class="auth-panel show" id="auth-panel">
+        <div class="auth-grid">
+          <input class="control" id="auth-email" type="email" placeholder="Email address" autocomplete="email">
+          <input class="control" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+          <button type="button" class="primary" id="sign-in" onclick="signIn()">Sign In</button>
+          <button type="button" class="secondary" id="sign-up" onclick="signUp()">Create Login</button>
+          <button type="button" class="secondary hidden" id="sign-out" onclick="signOut()">Sign Ou

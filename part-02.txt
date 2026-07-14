@@ -1,0 +1,217 @@
+t</button>
+        </div>
+        <div class="auth-status" id="auth-status">Sign in to save and load leads from Supabase on any computer.</div>
+      </section>
+
+      <section id="dashboard-only">
+        <div class="grid stats">
+          <div class="stat"><span>Total active leads</span><strong id="stat-active">0</strong></div>
+          <div class="stat"><span>Proposals out</span><strong id="stat-proposals">0</strong></div>
+          <div class="stat"><span>Follow ups due</span><strong id="stat-due">0</strong></div>
+        </div>
+
+        <div class="due-strip" id="due-strip">
+          <div class="due-head">
+            <span>Due today or overdue</span>
+            <span id="due-count-label">0</span>
+          </div>
+          <div class="due-list" id="due-list"></div>
+        </div>
+      </section>
+
+      <section id="tracker-view">
+        <div class="toolbar">
+          <input class="control" id="search" type="search" placeholder="Search name, company, notes">
+          <select class="control" id="stage-filter"></select>
+          <select class="control" id="priority-filter">
+            <option value="">All priorities</option>
+            <option>High</option>
+            <option>Med</option>
+            <option>Low</option>
+          </select>
+          <select class="control" id="platform-filter"></select>
+          <select class="control" id="source-filter"></select>
+        </div>
+        <div class="lead-list" id="lead-list"></div>
+      </section>
+
+      <section id="clients-view" class="hidden">
+        <div class="toolbar">
+          <input class="control" id="client-search" type="search" placeholder="Search company or notes">
+          <select class="control" id="client-source-filter"></select>
+          <select class="control" id="client-score-filter">
+            <option value="">All scores</option>
+            <option value="8">Score 8+</option>
+            <option value="5">Score 5+</option>
+            <option value="1">Score 1+</option>
+          </select>
+          <select class="control" id="client-open-filter">
+            <option value="">All companies</option>
+            <option value="open">Open opportunities</option>
+            <option value="none">No open opportunities</option>
+          </select>
+        </div>
+        <div class="client-list" id="client-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <section class="drawer" id="session-drawer" aria-hidden="true">
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div class="drawer-header">
+        <div>
+          <h3 id="drawer-title">Add Session</h3>
+          <p class="small">One row is one contact instance. History is kept forever.</p>
+        </div>
+        <button type="button" class="icon-button" id="close-drawer" aria-label="Close">×</button>
+      </div>
+
+      <div class="duplicate" id="duplicate-prompt"></div>
+
+      <form id="session-form">
+        <input type="hidden" id="session-id">
+        <div class="form-grid">
+          <div class="field">
+            <label for="date">Date</label>
+            <input id="date" type="date">
+          </div>
+          <div class="field">
+            <label for="name">Name <span class="hint">checked for history</span></label>
+            <input id="name" list="name-list" autocomplete="off" placeholder="Start typing a name">
+            <datalist id="name-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="company">Company</label>
+            <input id="company" list="company-list" autocomplete="off" placeholder="Company">
+            <datalist id="company-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="stage">Stage</label>
+            <select id="stage"></select>
+          </div>
+          <div class="field">
+            <label for="priority">Priority</label>
+            <select id="priority">
+              <option>Med</option>
+              <option>High</option>
+              <option>Low</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="reason">Reason</label>
+            <input id="reason" list="reason-list" placeholder="Pick or type a short reason">
+            <datalist id="reason-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="platform">Platform</label>
+            <select id="platform"></select>
+          </div>
+          <div class="field">
+            <label for="lead-source">Lead Source</label>
+            <select id="lead-source"></select>
+          </div>
+          <div class="field">
+            <label for="last-contacted">Last Contacted</label>
+            <input id="last-contacted" type="date">
+          </div>
+          <div class="field">
+            <label for="follow-up">Follow Up</label>
+            <input id="follow-up" type="date">
+          </div>
+          <div class="field">
+            <label for="fee">Fee (£)</label>
+            <input id="fee" type="number" min="0" step="50" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="testimonial">Testimonial</label>
+            <select id="testimonial">
+              <option>No</option>
+              <option>Yes</option>
+              <option>Asked</option>
+              <option>Received</option>
+              <option>N/A</option>
+            </select>
+          </div>
+          <div class="field full">
+            <label>Fast reason buttons</label>
+            <div class="chips" id="reason-chips"></div>
+          </div>
+          <div class="field full">
+            <label for="next-action">Next Action</label>
+            <textarea id="next-action" placeholder="Keep this short. Example: Send proposal Friday."></textarea>
+          </div>
+          <div class="field full">
+            <label for="notes">Notes</label>
+            <textarea id="notes" placeholder="Optional context from the conversation."></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="secondary" id="delete-session">Delete</button>
+          <button type="button" class="secondary" id="cancel-session">Cancel</button>
+          <button type="submit" class="primary">Save Session</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="modal-backdrop" id="person-modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="person-title">
+      <div class="modal-header">
+        <div>
+          <h3 id="person-title">Person History</h3>
+          <p class="small" id="person-summary"></p>
+        </div>
+        <button type="button" class="icon-button" id="close-person" aria-label="Close">×</button>
+      </div>
+      <div id="person-timeline" class="timeline"></div>
+    </div>
+  </section>
+
+  <section class="drawer" id="client-drawer" aria-hidden="true">
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="client-title">
+      <div class="drawer-header">
+        <div>
+          <h3 id="client-title">Client Details</h3>
+          <p class="small">Company-level notes stay visible regardless of session stage.</p>
+        </div>
+        <button type="button" class="icon-button" id="close-client" aria-label="Close">×</button>
+      </div>
+      <form id="client-form">
+        <input type="hidden" id="client-company-key">
+        <div class="form-grid">
+          <div class="field">
+            <label for="client-company">Company</label>
+            <input id="client-company" disabled>
+          </div>
+          <div class="field">
+            <label for="client-industry">Industry</label>
+            <input id="client-industry" list="industry-list" placeholder="Pick or type">
+            <datalist id="industry-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="client-primary-offer">Primary Offer</label>
+            <input id="client-primary-offer" list="offer-list" placeholder="Pick or type">
+            <datalist id="offer-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="client-bureau">Bureau?</label>
+            <select id="client-bureau">
+              <option></option>
+              <option>Yes</option>
+              <option>No</option>
+              <option>Maybe</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="client-score">Relationship Score</label>
+            <select id="client-score"></select>
+          </div>
+          <div class="field full">
+            <label for="client-notes">Notes</label>
+            <textarea id="client-notes" placeholder="Company-level notes."></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="secondary" id="cancel-client">Cancel</button>
+          <button type="submit" class="primary">Save Client</button>
+  

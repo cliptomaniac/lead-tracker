@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lead Tracker | Talk Dygital</title>
+</head>
+<body style="margin:0;background:#071116;color:#edf7f5;font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh">
+  <div>Loading Lead Tracker...</div>
+  <script>
+    (async () => {
+      const parts = ['parts/part-00.txt','parts/part-01.txt','parts/part-02.txt','parts/part-03.txt','parts/part-04.txt','parts/part-05.txt','parts/part-06.txt','parts/part-07.txt','parts/part-08.txt','parts/part-09.txt','parts/part-10.txt','parts/part-11.txt'];
+      const html = (await Promise.all(parts.map(async path => {
+        const response = await fetch(path, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Could not load ${path}`);
+        return response.text();
+      }))).join('');
+      document.open();
+      document.write(html);
+      document.close();
+    })().catch(error => {
+      document.body.innerHTML = `<main style="max-width:680px;padding:24px"><h1>Lead Tracker could not load</h1><p>${error.message}</p></main>`;
+    });
+  </script>
+</body>
+</html>

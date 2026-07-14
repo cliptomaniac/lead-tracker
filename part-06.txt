@@ -1,0 +1,257 @@
+se);
+        return;
+      }
+      const imported = cloneImportedData();
+      const existingIds = new Set(state.sessions.map(session => session.id));
+      const newSessions = imported.sessions.filter(session => !existingIds.has(session.id));
+      state.sessions = [...newSessions, ...state.sessions];
+      state.clientMeta = { ...imported.clientMeta, ...state.clientMeta };
+      render();
+      saveState();
+      toast(newSessions.length ? `Added ${newSessions.length} spreadsheet sessions` : "2026 data is already added");
+    }
+
+    async function resetToImportedData() {
+      if (currentUser) {
+        if (!confirm("Replace your Supabase Lead Tracker data with the imported 2026 spreadsheet data?")) return;
+        await importToCloud(true);
+        return;
+      }
+      state = cloneImportedData();
+      currentView = "active";
+      render();
+      saveState();
+      toast(`Loaded ${state.sessions.length} spreadsheet sessions`);
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (error) {
+        toast("Loaded, but this browser did not save it");
+      }
+    }
+
+    async function initCloud() {
+      supabaseSession = loadCloudSession();
+      currentUser = supabaseSession?.user || null;
+      updateAuthUi();
+      if (currentUser) await loadCloudData();
+    }
+
+    function updateAuthUi() {
+      const signedIn = !!currentUser;
+      els.signOut.classList.toggle("hidden", !signedIn);
+      els.signIn.classList.toggle("hidden", signedIn);
+      els.signUp.classList.toggle("hidden", signedIn);
+      els.authEmail.disabled = signedIn;
+      els.authPassword.disabled = signedIn;
+      els.cloudStatus.textContent = signedIn ? `Cloud mode: ${currentUser.email}` : "Local mode";
+      setAuthStatus(signedIn ? `Signed in as ${currentUser.email}. Changes save to Supabase.` : "Sign in to save and load leads from Supabase on any computer.");
+    }
+
+    function setAuthStatus(message) {
+      if (els.authStatus) els.authStatus.textContent = message;
+    }
+
+    async function signUp() {
+      setAuthStatus("Creating login...");
+      const email = els.authEmail.value.trim();
+      const password = els.authPassword.value;
+      if (!email || password.length < 6) {
+        setAuthStatus("Enter an email and a password with at least 6 characters.");
+        return toast("Use email and 6+ character password");
+      }
+      const { data, error } = await supabaseFetch("/auth/v1/signup", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
+      if (error) {
+        setAuthStatus(error.message || "Could not create login");
+        return toast(error.message || "Could not create login");
+      }
+      if (data?.access_token) saveCloudSession(data);
+      currentUser = data?.user || null;
+      updateAuthUi();
+      toast("Login created");
+      setAuthStatus(currentUser ? "Login created and signed in." : "Login created. If asked, confirm your email, then sign in.");
+    }
+
+    async function signIn() {
+      setAuthStatus("Signing in...");
+      const email = els.authEmail.value.trim();
+      const password = els.authPassword.value;
+      if (!email || !password) {
+        setAuthStatus("Enter your email and password first.");
+        return toast("Enter email and password");
+      }
+      const { data, error } = await supabaseFetch("/auth/v1/token?grant_type=password", {
+        method: "POST",
+        body: JSON.stringify({ email, password })
+      });
+      if (error) {
+        setAuthStatus(error.message || "Could not sign in");
+        return toast(error.message || "Could not sign in");
+      }
+      saveCloudSession(data);
+      currentUser = data.user;
+      updateAuthUi();
+      await checkCloudLogin();
+      await loadCloudData();
+      toast("Signed in");
+    }
+
+    async function signOut() {
+      supabaseSession = null;
+      currentUser = null;
+      localStorage.removeItem(`${STORAGE_KEY}-cloud-session`);
+      updateAuthUi();
+      toast("Signed out");
+    }
+
+    function loadCloudSession() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(`${STORAGE_KEY}-cloud-session`));
+        if (stored?.access_token && stored?.user) return stored;
+      } catch (error) {}
+      return null;
+    }
+
+    async function checkCloudLogin() {
+      const { data, error } = await supabaseFetch("/auth/v1/user");
+      if (error) {
+        setAuthStatus(`Signed in, but Supabase user check failed: ${error.message}`);
+        return false;
+      }
+      if (data?.id) {
+        currentUser = data;
+        return true;
+      }
+      return false;
+    }
+
+    function saveCloudSession(session) {
+      supabaseSession = session;
+      localStorage.setItem(`${STORAGE_KEY}-cloud-session`, JSON.stringify(session));
+    }
+
+    function cloudHeaders(extra = {}) {
+      const headers = {
+        apikey: SUPABASE_PUBLISHABLE_KEY,
+        "Content-Type": "application/json",
+        ...extra
+      };
+      if (supabaseSession?.access_token) headers.Authorization = `Bearer ${supabaseSession.access_token}`;
+      return headers;
+    }
+
+    async function refreshCloudSession() {
+      if (!supabaseSession?.refresh_token) return false;
+      try {
+        const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ refresh_token: supabaseSession.refresh_token })
+        });
+        const text = await response.text();
+        let data = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch (error) {
+          data = null;
+        }
+        if (!response.ok || !data?.access_token) return false;
+        saveCloudSession(data);
+        currentUser = data.user || currentUser;
+        updateAuthUi();
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    async function supabaseFetch(path, options = {}) {
+      try {
+        let response = await fetch(`${SUPABASE_URL}${path}`, {
+          ...options,
+          headers: cloudHeaders(options.headers || {})
+        });
+        let text = await response.text();
+        let data = null;
+        try {
+          data = text ? JSON.parse(text) : null;
+        } catch (error) {
+          data = text;
+        }
+        const message = formatCloudError(data);
+        const canRefresh = response.status === 401 && /jwt|expired/i.test(message) && !path.startsWith("/auth/v1/token");
+        if (canRefresh && await refreshCloudSession()) {
+          response = await fetch(`${SUPABASE_URL}${path}`, {
+            ...options,
+            headers: cloudHeaders(options.headers || {})
+          });
+          text = await response.text();
+          try {
+            data = text ? JSON.parse(text) : null;
+          } catch (error) {
+            data = text;
+          }
+        }
+        if (!response.ok) {
+          return {
+            data: null,
+            error: {
+              message: formatCloudError(data) || `${response.status} ${response.statusText}`,
+              status: response.status,
+              raw: data
+            }
+          };
+        }
+        return { data, error: null };
+      } catch (error) {
+        return { data: null, error: { message: error.message } };
+      }
+    }
+
+    function formatCloudError(error) {
+      if (!error) return "";
+      if (typeof error === "string") return error;
+      return error.message || error.error_description || error.msg || JSON.stringify(error);
+    }
+
+    async function loadCloudData(autoSeed = true) {
+      if (!currentUser) return;
+      setAuthStatus("Loading from Supabase...");
+      const [sessionsResult, clientsResult] = await Promise.all([
+        supabaseFetch("/rest/v1/lead_sessions?select=*&order=updated_at.desc"),
+        supabaseFetch("/rest/v1/clients?select=*")
+      ]);
+      if (sessionsResult.error || clientsResult.error) {
+        const message = sessionsResult.error?.message || clientsResult.error?.message || "Cloud load failed";
+        setAuthStatus(`Could not load cloud data: ${message}`);
+        toast(message);
+        return;
+      }
+      state = {
+        sessions: (sessionsResult.data || []).map(fromDbSession),
+        clientMeta: {}
+      };
+      (clientsResult.data || []).forEach(client => {
+        state.clientMeta[client.company_key] = fromDbClient(client);
+      });
+      if (!state.sessions.length && autoSeed) {
+        setAuthStatus("Cloud database is empty. Loading your 2026 data now...");
+        await importToCloud(true, false);
+        return;
+      }
+      setAuthStatus(state.sessions.length ? `Loaded ${state.sessions.length} cloud sessions.` : "Signed in. Cloud database is empty.");
+      render();
+    }
+
+    async function saveCloudSessionRecord(session) {
+      if (!currentUser) return false;
+      saveEmergencyDraft(session);
+      const row = toDbSess
